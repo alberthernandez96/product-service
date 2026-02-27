@@ -26,8 +26,8 @@ jobs:
 
     # Permissions needed for this job
     permissions:
-      contents: read    # Read repository code
-      packages: write   # Push images to GitHub Container Registry
+      contents: read # Read repository code
+      packages: write # Push images to GitHub Container Registry
 
     # Steps are executed sequentially
     steps:
@@ -44,9 +44,9 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}                    # ghcr.io
-          username: ${{ github.actor }}                    # Your GitHub username
-          password: ${{ secrets.NPM_TOKEN }}            # Auto-generated GitHub token
+          registry: ${{ env.REGISTRY }} # ghcr.io
+          username: ${{ github.actor }} # Your GitHub username
+          password: ${{ secrets.NPM_TOKEN }} # Auto-generated GitHub token
 
       # Step 4: Generate Docker image tags
       # Tags help identify different versions of the image
@@ -64,10 +64,10 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .                                       # Build context (current directory)
-          push: true                                       # Push image to registry after build
-          tags: ${{ steps.meta.outputs.tags }}            # Use tags from previous step
-          labels: ${{ steps.meta.outputs.labels }}        # Add metadata labels
+          context: . # Build context (current directory)
+          push: true # Push image to registry after build
+          tags: ${{ steps.meta.outputs.tags }} # Use tags from previous step
+          labels: ${{ steps.meta.outputs.labels }} # Add metadata labels
           build-args: |
             # Pass GitHub token to Dockerfile for installing private npm packages
             NPM_TOKEN=${{ secrets.NPM_TOKEN }}
@@ -116,6 +116,9 @@ jobs:
             export GITHUB_USERNAME=alberthernandez96
             export IMAGE_NAME=${{ env.IMAGE_NAME }}
             export REGISTRY=${{ env.REGISTRY }}
+
+            # Export JWT secret
+            export JWT_SECRET=${{ secrets.JWT_SECRET }}
 
             export IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
