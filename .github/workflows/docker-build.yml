@@ -1,0 +1,139 @@
+# Workflow name that appears in GitHub Actions tab
+name: Build and Deploy to Production
+
+# Trigger conditions: When this workflow should run
+on:
+  # Run on every push to main branch (production deployments)
+  push:
+    branches:
+      - main
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+# Environment variables used throughout the workflow
+env:
+  # GitHub Container Registry URL
+  REGISTRY: ghcr.io
+  # Image name will be: ghcr.io/username/repo-name
+  IMAGE_NAME: ${{ github.repository }}
+
+# Jobs define what the workflow will do
+jobs:
+  # Single job that builds and deploys
+  build-and-deploy:
+    # Run on GitHub's Ubuntu latest runner
+    runs-on: ubuntu-latest
+
+    # Permissions needed for this job
+    permissions:
+      contents: read    # Read repository code
+      packages: write   # Push images to GitHub Container Registry
+
+    # Steps are executed sequentially
+    steps:
+      # Step 1: Get the code from the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Docker Buildx (advanced Docker build features)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 3: Authenticate with GitHub Container Registry
+      # This allows us to push the Docker image
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}                    # ghcr.io
+          username: ${{ github.actor }}                    # Your GitHub username
+          password: ${{ secrets.NPM_TOKEN }}            # Auto-generated GitHub token
+
+      # Step 4: Generate Docker image tags
+      # Tags help identify different versions of the image
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch                          # Tag with branch name (main)
+            type=sha,prefix=,format=short                  # Tag with short commit SHA
+            type=raw,value=latest,enable={{is_default_branch}}  # Tag as 'latest' for main branch
+
+      # Step 5: Build the Docker image and push it to the registry
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .                                       # Build context (current directory)
+          push: true                                       # Push image to registry after build
+          tags: ${{ steps.meta.outputs.tags }}            # Use tags from previous step
+          labels: ${{ steps.meta.outputs.labels }}        # Add metadata labels
+          build-args: |
+            # Pass GitHub token to Dockerfile for installing private npm packages
+            NPM_TOKEN=${{ secrets.NPM_TOKEN }}
+          # Use GitHub Actions cache to speed up builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Step 6: Ensure deploy directory exists on server (required for SCP target)
+      - name: Ensure deploy directory exists
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.VULTR_HOST }}
+          username: ${{ vars.VULTR_USER }}
+          key: ${{ secrets.VULTR_SSH_KEY }}
+          port: ${{ vars.VULTR_PORT}}
+          script: mkdir -p /services/product-service
+
+      # Step 7: Copy docker-compose.yml from repo to server
+      - name: Copy docker-compose to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.VULTR_HOST }}
+          username: ${{ vars.VULTR_USER }}
+          key: ${{ secrets.VULTR_SSH_KEY }}
+          port: ${{ vars.VULTR_PORT}}
+          source: "docker-compose.yml"
+          target: "/services/product-service/"
+
+      # Step 8: Deploy to Vultr production server
+      - name: Deploy to Vultr Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.VULTR_HOST }}
+          username: ${{ vars.VULTR_USER }}
+          key: ${{ secrets.VULTR_SSH_KEY }}
+          port: ${{ vars.VULTR_PORT }}
+          script: |
+            # Export database environment variables (optional, when product-service uses DB)
+            export DB_USER=${{ vars.DB_USER }}
+            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            export DB_NAME=product-service
+            export DB_HOST=${{ vars.DB_HOST }}
+            export DB_PORT=${{ vars.DB_PORT }}
+
+            # Export GitHub username y registry info
+            export GITHUB_USERNAME=alberthernandez96
+            export IMAGE_NAME=${{ env.IMAGE_NAME }}
+            export REGISTRY=${{ env.REGISTRY }}
+
+            export IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            cd /services/product-service
+
+            # Login GHCR
+            echo "${{ secrets.GHCR_TOKEN }}" | docker --config /tmp/.docker login $REGISTRY -u $GITHUB_USERNAME --password-stdin
+
+            # Pull image más reciente
+            docker pull $REGISTRY/$IMAGE_NAME:latest
+
+            # Limpiar contenedores huérfanos y redes
+            docker compose down --remove-orphans || true
+            docker network prune -f || true
+
+            # Levantar solo el product-service sin dependencias
+            docker compose up -d --no-deps product-service
+
+            # Ver contenedores activos
+            docker compose ps
+            docker image prune -f

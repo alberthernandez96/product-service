@@ -1,0 +1,77 @@
+# Local development: Postgres + Observability Stack (Jaeger, Prometheus, Grafana)
+# Uses different host ports than quote-service stack so both can run at once (no conflict).
+# Preferred: use the shared stack from quote-service and only run this if you need product-service alone.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: product-service-postgres-dev
+    restart: unless-stopped
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: product-service
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - product-service-network
+
+  # Jaeger - Para visualizar traces
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: product-service-jaeger
+    restart: unless-stopped
+    ports:
+      - "16687:16686"  # Jaeger UI (host 16687 to avoid conflict with quote-service)
+      - "4319:4317"    # OTLP gRPC (host 4319)
+      - "4320:4318"    # OTLP HTTP (host 4320)
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - product-service-network
+
+  # Prometheus - Para recopilar métricas
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: product-service-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - product-service-network
+
+  # Grafana - Para visualizar métricas y traces
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: product-service-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - product-service-network
+    depends_on:
+      - prometheus
+      - jaeger
+
+volumes:
+  postgres_dev_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  product-service-network:
+    driver: bridge

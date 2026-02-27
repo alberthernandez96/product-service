@@ -1,0 +1,32 @@
+services:
+  product-service:
+    image: ${IMAGE}
+    container_name: product-service
+    restart: unless-stopped
+    ports:
+      # Expose application port
+      - "3005:3005"
+    environment:
+      NODE_ENV: production
+      PORT: 3005  
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/product-service
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: quote-service
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+      DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-30000}
+      DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-2000}
+      JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - quote-service-network
+    build:
+      context: .
+      args:
+        NPM_TOKEN: ${NPM_TOKEN}
+
+# Network for services to communicate
+networks:
+  quote-service-network:
+    driver: bridge

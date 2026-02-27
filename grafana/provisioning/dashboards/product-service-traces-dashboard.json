@@ -1,0 +1,39 @@
+{
+  "dashboard": {
+    "title": "Product Service - Traces Dashboard (Jaeger)",
+    "tags": ["product-service", "observability", "traces", "jaeger"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Trace by ID",
+        "type": "traces",
+        "gridPos": { "h": 20, "w": 24, "x": 0, "y": 0 },
+        "datasource": { "type": "jaeger", "uid": "jaeger" },
+        "targets": [{ "query": "${traceId}", "refId": "A" }],
+        "options": {},
+        "description": "Introduce un Trace ID en la variable del dashboard (arriba) o ve a Explore → Jaeger para buscar traces por servicio (product-service)."
+      }
+    ],
+    "time": { "from": "now-1h", "to": "now" },
+    "timepicker": {},
+    "templating": {
+      "list": [
+        {
+          "name": "traceId",
+          "type": "textbox",
+          "label": "Trace ID",
+          "description": "Pega un Trace ID de Jaeger para visualizarlo, o deja vacío y usa Explore (menú lateral) con datasource Jaeger para buscar por servicio.",
+          "current": {},
+          "options": [],
+          "query": "",
+          "hide": 0
+        }
+      ]
+    },
+    "annotations": { "list": [] }
+  }
+}

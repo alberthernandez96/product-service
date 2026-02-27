@@ -1,0 +1,12 @@
+# Environment
+.env
+
+# Dependencies
+node_modules/
+
+# JavaScript files
+*.js
+*.js.map
+
+# Build output
+dist/
