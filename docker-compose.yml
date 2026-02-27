@@ -14,13 +14,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
-      DB_NAME: quote-service
+      DB_NAME: product-service
       DB_POOL_MAX: ${DB_POOL_MAX:-20}
       DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-30000}
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-2000}
       JWT_SECRET: ${JWT_SECRET}
     networks:
-      - quote-service-network
+      - product-service-network
     build:
       context: .
       args:
@@ -28,5 +28,5 @@ services:
 
 # Network for services to communicate
 networks:
-  quote-service-network:
+  product-service-network:
     driver: bridge
